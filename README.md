@@ -1,34 +1,72 @@
-# Myntra Pro — Full-Stack E-Commerce Web Application
+# Myntra Pro — Enterprise Fashion E-Commerce Platform
 
-A full-stack, production-grade e-commerce web platform inspired by Myntra, built with **React + Vite** and connected to the existing **Node.js/Express** backend and **MongoDB** database (`myntra_pro`).
+A production-grade, enterprise luxury fashion e-commerce ecosystem inspired by Myntra, Nike, Zara, and modern designer platforms. Built with **React 18 + Vite**, an independent **Node.js/Express** enterprise backend, a dedicated **MongoDB Atlas/Local** database (`myntra_web_pro`), distributed **Redis (v8.0)** caching, **Socket.IO** real-time tracking, and **AI-powered** shopping assistance.
+
+---
+
+## 🏗️ Architecture & Component Ecosystem
+
+```
+myntra-project/
+│
+├── myntra-web/                           # Frontend React 18 SPA (Vercel Ready)
+│   ├── src/
+│   │   ├── components/                   # Navbar, MegaMenu, AIChatModal, Filters, Cards
+│   │   ├── context/                      # Auth, Cart, Wishlist, Toast
+│   │   ├── layouts/                      # PublicLayout, RoleLayout
+│   │   ├── pages/                        # Storefront & 4 Role Portals (Lazy Loaded)
+│   │   ├── services/                     # REST API, AI, Payment, Order Services
+│   │   └── styles/                       # Luxury Design System & Global Styles
+│   ├── package.json
+│   └── vite.config.js
+│
+└── myntra-backend/                       # Enterprise REST API & Realtime Backend
+    ├── src/
+    │   ├── config/                       # Dedicated MongoDB (myntra_web_pro) Connection
+    │   ├── controllers/                  # Auth, Products, Orders, AI, Payments, Admin
+    │   ├── middleware/                   # RBAC Authorization, JWT, Rate Limiting, Helmet
+    │   ├── models/                       # 18 Dedicated Mongoose Schemas with Indexes
+    │   ├── routes/                       # Modular REST API Routes
+    │   ├── services/                     # Cache (Redis/Memory), AI (Gemini), Razorpay
+    │   ├── sockets/                      # Socket.IO Real-time Order & Delivery Server
+    │   └── server.js                     # Express HTTP + WebSocket Server
+    ├── .env
+    └── package.json
+```
 
 ---
 
 ## 🚀 Quick Launch Guide
 
-### 1. Start MongoDB
-Ensure MongoDB is running locally:
+### 1. Start MongoDB & Redis
+Ensure MongoDB and Redis are active:
 ```bash
-mongod --dbpath /data/db --fork --logpath /tmp/mongod.log
+# Start MongoDB (if not running)
+mongod --bind_ip_all --fork --logpath /tmp/mongod.log
+
+# Start Redis (if not running)
+redis-server --daemonize yes
 ```
 
-### 2. Start Express Backend
+### 2. Start Dedicated Express Backend (`myntra-backend`)
 ```bash
-cd ~/Desktop/Projects/Myntra/backend
-npm run start
-# Server listens on http://localhost:5000 (Health check: http://localhost:5000/api/health)
+cd ~/Desktop/Projects/myntra-backend
+npm install
+npm run seed     # Seeds dedicated database 'myntra_web_pro' with 15 categories, 780 products & demo users
+npm run start    # Listens on http://localhost:5000 (Health: http://localhost:5000/api/health)
 ```
 
-*(Optional: If resetting or seeding the catalog with 780 products and demo accounts)*
+### 3. Run Automated API Test Suite
 ```bash
-npm run seed
+cd ~/Desktop/Projects/myntra-backend
+npm test
 ```
 
-### 3. Start React + Vite Frontend
+### 4. Start React + Vite Frontend (`myntra-web`)
 ```bash
 cd ~/Desktop/Projects/myntra-web
-npm run dev
-# Frontend runs at: http://localhost:5173
+npm install
+npm run dev      # Launches storefront on http://localhost:5173
 ```
 
 ---
@@ -37,49 +75,37 @@ npm run dev
 
 | Portal / Role | Email | Password | Access Privileges |
 |---|---|---|---|
-| **Customer** | `demo@myntrapro.com` | `Password123` | Browsing, Wishlist, Bag, Checkout, Order Tracking |
-| **Super Admin** | `admin@myntrapro.com` | `AdminPassword123` | Catalog, Categories, Financials, User Blocks, Staff Roster, Audit Logs |
-| **Transport Manager** | `transport@myntrapro.com` | `TransportPass123` | Logistics Dashboard, Shipments, Assign Courier Staff, Status Tracking |
-| **Delivery Staff** | `delivery@myntrapro.com` | `DeliveryPass123` | Assigned Deliveries Queue, Digital Proof of Delivery, Outcome Submission |
-| **Blocked User** | `blocked@myntrapro.com` | `Password123` | Account restriction enforcement demonstration |
+| **Customer Storefront** | `demo@myntrapro.com` | `Password123` | Browsing, Bag, Checkout, Live Order Tracking with Handover OTP |
+| **Super Administrator** | `admin@myntrapro.com` | `AdminPassword123` | Analytics, Revenue, Catalog CRUD, User Restriction, Audit Logs |
+| **Logistics / Travel Partner** | `transport@myntrapro.com` | `TransportPass123` | Dispatch Assignments, Fleet Vehicles, Waypoint Logging, Tracking |
+| **Delivery Courier Partner** | `delivery@myntrapro.com` | `DeliveryPass123` | Assigned Tasks, Delivery Handover OTP Verification, Digital POD |
+| **Company Fulfillment** | `company@myntrapro.com` | `CompanyPass123` | Warehouse Operations, Packing, Dispatch Staging, Inventory |
+| **Restricted / Blocked User** | `blocked@myntrapro.com` | `Password123` | Security blocking demonstration |
 
 ---
 
-## 📦 15 Fashion Departments (780 Unique Products)
+## 🌟 Key Features Implemented
 
-Each category contains 52 unique catalog items with live server-side filtering, sorting, and pagination:
+1. **AI Fashion Concierge & Natural Language Search**:
+   - Floating AI assistant widget available across all pages.
+   - Natural language search query parsing (e.g., *"cotton shirts for men under 2000"*).
+   - Complete the Look / AI Outfit Coordination recommendations with bundle savings.
 
-1. **Men's Clothing** (`/products?category=mens-clothing`)
-2. **Women's Clothing** (`/products?category=womens-clothing`)
-3. **Kids' Clothing** (`/products?category=kids-clothing`)
-4. **Men's Footwear** (`/products?category=mens-footwear`)
-5. **Women's Footwear** (`/products?category=womens-footwear`)
-6. **Kids' Footwear** (`/products?category=kids-footwear`)
-7. **Bags & Backpacks** (`/products?category=bags-backpacks`)
-8. **Watches & Wearables** (`/products?category=watches-wearables`)
-9. **Jewellery** (`/products?category=jewellery`)
-10. **Beauty & Makeup** (`/products?category=beauty-makeup`)
-11. **Skincare & Personal Care** (`/products?category=skincare-personal-care`)
-12. **Sportswear & Activewear** (`/products?category=sportswear-activewear`)
-13. **Home & Living** (`/products?category=home-living`)
-14. **Ethnic & Traditional Wear** (`/products?category=ethnic-traditional-wear`)
-15. **Lingerie & Sleepwear** (`/products?category=lingerie-sleepwear`)
+2. **15 Curated Departments (780 Unique Products)**:
+   - Men's Clothing, Women's Clothing, Kids' Clothing, Men's Footwear, Women's Footwear, Kids' Footwear, Bags & Backpacks, Watches & Wearables, Jewellery, Beauty & Makeup, Skincare & Personal Care, Sportswear & Activewear, Home & Living, Ethnic & Traditional Wear, Lingerie & Sleepwear.
+   - Faceted filtering: brand, price range, discount %, customer rating, size, color.
 
----
+3. **Real-time Order Lifecycle & Delivery OTP**:
+   - Full order lifecycle: `PLACED → CONFIRMED → PACKED → DISPATCHED → IN TRANSIT → OUT FOR DELIVERY → DELIVERED`.
+   - Real-time updates delivered via **Socket.IO**.
+   - 4-digit **Delivery Handover OTP** displayed on the customer tracking page and verified by courier on delivery.
 
-## 🛠️ Technology Stack & Architecture
+4. **Cart, Coupons & Multi-Option Checkout**:
+   - Promo codes: `FIRST100` (₹100 Off), `SAVE200` (₹200 Off), `FESTIVE25` (25% Off), `VIP30` (30% Off).
+   - Razorpay payment order creation and signature verification.
+   - Cash on Delivery (COD) with verification OTP, UPI, Cards, Net Banking.
 
-- **Frontend**: React 18, Vite 6, React Router DOM v6, Axios, Lucide React, Canvas Confetti
-- **State Management**: React Context API (`AuthContext`, `CartContext`, `WishlistContext`, `ToastContext`)
-- **Backend**: Node.js, Express, MongoDB with Mongoose
-- **Security**: JWT tokens in Authorization headers, atomic stock deduction, input sanitization, RBAC middleware
-
----
-
-## 🌐 Environment Variables
-
-File: `~/Desktop/Projects/myntra-web/.env`
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-# MYNTRA
+5. **Performance & Security**:
+   - Route-based code splitting: Main bundle reduced to **298 kB (gzip 93 kB)**.
+   - Redis caching with high-speed in-memory fallback.
+   - Helmet security headers, rate limiting, and request correlation IDs.

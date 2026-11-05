@@ -37,7 +37,7 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = async ({ productId, selectedSize, selectedColor, quantity = 1, productName }) => {
     if (!isAuthenticated) {
-      info('Please log in to add items to your shopping bag');
+      info('Please log in to continue');
       return { requiresAuth: true };
     }
 
@@ -50,10 +50,10 @@ export const CartProvider = ({ children }) => {
         quantity,
       });
       setCart(updatedCart);
-      success(`Added "${productName || 'Item'}" to your shopping bag!`);
+      success(updatedCart?.message || (productName ? `Added "${productName}" to your shopping bag!` : 'Product added successfully.'));
       return { success: true, cart: updatedCart };
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to add item to bag';
+      const msg = err.response?.data?.message || (!navigator.onLine ? 'Unable to connect to the server' : 'Failed to add item to bag');
       error(msg);
       throw err;
     } finally {
@@ -68,7 +68,7 @@ export const CartProvider = ({ children }) => {
       setCart(updatedCart);
       return updatedCart;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to update item quantity';
+      const msg = err.response?.data?.message || (!navigator.onLine ? 'Unable to connect to the server' : 'Failed to update item quantity');
       error(msg);
       throw err;
     } finally {
@@ -81,10 +81,10 @@ export const CartProvider = ({ children }) => {
       setLoading(true);
       const updatedCart = await cartService.removeFromCart(itemId);
       setCart(updatedCart);
-      success('Item removed from shopping bag');
+      success(updatedCart?.message || 'Item removed from shopping bag');
       return updatedCart;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to remove item';
+      const msg = err.response?.data?.message || (!navigator.onLine ? 'Unable to connect to the server' : 'Failed to remove item');
       error(msg);
       throw err;
     } finally {
@@ -111,10 +111,11 @@ export const CartProvider = ({ children }) => {
       const subtotal = cart.summary?.subtotal || 0;
       const res = await cartService.applyCoupon({ code, cartSubtotal: subtotal });
       setAppliedCoupon(res);
-      success(`Coupon "${res.code}" applied! You saved ₹${res.discountAmount}`);
+      await fetchCart();
+      success(res?.message || `Coupon "${res.code}" applied! You saved ₹${res.discountAmount}`);
       return res;
     } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid or expired coupon code';
+      const msg = err.response?.data?.message || (!navigator.onLine ? 'Unable to connect to the server' : 'Invalid or expired coupon code');
       error(msg);
       throw err;
     } finally {
@@ -127,22 +128,29 @@ export const CartProvider = ({ children }) => {
     info('Coupon removed');
   };
 
-  const totalItems = cart.summary?.totalItems || (cart.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0);
+  const totalItems = cart.summary?.totalItems ?? (cart.items || []).reduce((acc, it) => acc + (it.quantity || 1), 0);
 
-  // Compute final summary factoring in applied coupon
+  const rawSubtotal = cart.summary?.subtotal ?? 0;
+  const rawMrp = cart.summary?.totalMrp ?? cart.summary?.mrpTotal ?? rawSubtotal;
+  const rawDiscount = cart.summary?.totalDiscount ?? cart.summary?.productDiscount ?? Math.max(0, rawMrp - rawSubtotal);
+  const couponDiscount = appliedCoupon ? appliedCoupon.discountAmount : (cart.summary?.couponDiscount || 0);
+  const deliveryCharge = cart.summary?.deliveryCharge ?? (rawSubtotal > 1199 || rawSubtotal === 0 ? 0 : 79);
+  const convenienceFee = cart.summary?.convenienceFee ?? (rawSubtotal > 0 ? 20 : 0);
+  const totalAmount = Math.max(0, rawSubtotal - couponDiscount + deliveryCharge + convenienceFee);
+
   const summary = {
     totalItems,
-    totalMrp: cart.summary?.totalMrp || 0,
-    subtotal: cart.summary?.subtotal || 0,
-    totalDiscount: cart.summary?.totalDiscount || 0,
-    deliveryCharge: cart.summary?.deliveryCharge ?? ((cart.summary?.subtotal || 0) > 1199 || (cart.summary?.subtotal || 0) === 0 ? 0 : 79),
-    convenienceFee: cart.summary?.convenienceFee ?? ((cart.summary?.subtotal || 0) > 0 ? 20 : 0),
-    couponDiscount: appliedCoupon ? appliedCoupon.discountAmount : 0,
+    mrpTotal: rawMrp,
+    totalMrp: rawMrp,
+    subtotal: rawSubtotal,
+    productDiscount: rawDiscount,
+    totalDiscount: rawDiscount,
+    deliveryCharge,
+    convenienceFee,
+    couponDiscount,
     couponCode: appliedCoupon ? appliedCoupon.code : null,
-    totalAmount: Math.max(
-      0,
-      (cart.summary?.totalAmount || 0) - (appliedCoupon ? appliedCoupon.discountAmount : 0)
-    ),
+    total: totalAmount,
+    totalAmount,
   };
 
   return (
@@ -152,6 +160,7 @@ export const CartProvider = ({ children }) => {
         items: cart.items || [],
         summary,
         cartCount: totalItems,
+        totalItems,
         loading,
         appliedCoupon,
         addToCart,

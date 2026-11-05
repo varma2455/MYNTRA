@@ -21,13 +21,23 @@ export const productService = {
     return response.data;
   },
 
+  async getBrands() {
+    const response = await api.get('/brands');
+    return response.data;
+  },
+
   async getHomeFeed() {
     const response = await api.get('/home');
     return response.data;
   },
 
   async addReview(productId, reviewData) {
-    const response = await api.post(`/products/${productId}/review`, reviewData);
-    return response.data;
+    try {
+      const response = await api.post(`/products/${productId}/reviews`, reviewData);
+      return response.data;
+    } catch (err) {
+      const response = await api.post(`/products/${productId}/review`, reviewData);
+      return response.data;
+    }
   },
 };

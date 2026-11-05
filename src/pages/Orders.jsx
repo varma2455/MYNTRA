@@ -10,8 +10,13 @@ import {
   ChevronRight,
   AlertCircle,
   ShoppingBag,
-  ArrowLeft
+  ArrowLeft,
+  KeyRound,
+  ShieldCheck,
+  Radio,
+  MapPin
 } from 'lucide-react';
+import io from 'socket.io-client';
 import { orderService } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -19,14 +24,25 @@ import { Breadcrumbs } from '../components/Breadcrumbs';
 import { Loader } from '../components/Loader';
 import { Modal } from '../components/Modal';
 
+const LIFECYCLE_STEPS = [
+  'Placed',
+  'Confirmed',
+  'Packed',
+  'Dispatched',
+  'In Transit',
+  'Out for Delivery',
+  'Delivered',
+];
+
 export const Orders = () => {
-  const { isAuthenticated } = useAuth();
-  const { success, error } = useToast();
+  const { isAuthenticated, user } = useAuth();
+  const { success, error, info } = useToast();
   const navigate = useNavigate();
   const { orderId } = useParams();
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [socketConnected, setSocketConnected] = useState(false);
 
   // Cancel order modal
   const [cancelModalOrder, setCancelModalOrder] = useState(null);
@@ -58,6 +74,47 @@ export const Orders = () => {
       setLoading(false);
     }
   }, [isAuthenticated]);
+
+  // Socket.IO Real-time updates
+  useEffect(() => {
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on('connect', () => {
+      setSocketConnected(true);
+    });
+
+    socket.on('order:status_update', (data) => {
+      if (data?.orderId) {
+        info(`Order #${data.orderId} status updated: ${data.status}`);
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.orderId === data.orderId ? { ...o, status: data.status, trackingNumber: data.trackingNumber || o.trackingNumber } : o
+          )
+        );
+      }
+    });
+
+    socket.on('delivery:otp_verified', (data) => {
+      if (data?.orderId) {
+        success(`Delivery confirmed for Order #${data.orderId}!`);
+        setOrders((prev) =>
+          prev.map((o) => (o.orderId === data.orderId ? { ...o, status: 'Delivered', isOtpVerified: true } : o))
+        );
+      }
+    });
+
+    socket.on('disconnect', () => {
+      setSocketConnected(false);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   const handleCancelOrder = async () => {
     if (!cancelModalOrder) return;
@@ -97,7 +154,7 @@ export const Orders = () => {
       <div className="container empty-state" style={{ padding: '80px 20px' }}>
         <Package size={48} color="var(--primary)" />
         <h2>PLEASE SIGN IN</h2>
-        <p>Login to view your placed orders and delivery timelines.</p>
+        <p>Login to view your placed orders, live shipment tracking and OTP verification.</p>
         <Link to="/login" className="btn btn-primary btn-lg">
           LOGIN NOW
         </Link>
@@ -108,7 +165,7 @@ export const Orders = () => {
   if (loading) {
     return (
       <div className="container" style={{ padding: '80px 20px' }}>
-        <Loader size="large" text="Retrieving your orders..." />
+        <Loader size="large" text="Connecting to logistics tracking server..." />
       </div>
     );
   }
@@ -137,12 +194,21 @@ export const Orders = () => {
       case 'Out for Delivery':
         return <span className="badge badge-warning"><Truck size={12} /> OUT FOR DELIVERY</span>;
       case 'Dispatched':
-        return <span className="badge badge-info"><Truck size={12} /> DISPATCHED</span>;
-      case 'Processing':
-        return <span className="badge badge-warning"><Clock size={12} /> PROCESSING</span>;
+      case 'In Transit':
+        return <span className="badge badge-info"><Truck size={12} /> {status.toUpperCase()}</span>;
+      case 'Return Requested':
+        return <span className="badge badge-warning"><RotateCcw size={12} /> RETURN REQUESTED</span>;
       default:
         return <span className="badge badge-info"><Clock size={12} /> {status.toUpperCase()}</span>;
     }
+  };
+
+  const getStepIndex = (status) => {
+    const idx = LIFECYCLE_STEPS.indexOf(status);
+    if (idx !== -1) return idx;
+    if (status === 'Processing') return 1;
+    if (status === 'Ready for Dispatch') return 2;
+    return 0;
   };
 
   return (
@@ -150,13 +216,30 @@ export const Orders = () => {
       <Breadcrumbs items={[{ label: 'Orders & Returns' }]} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '16px 0 28px 0', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <h1 style={{ fontSize: '1.4rem', fontWeight: 800, textTransform: 'uppercase', margin: 0 }}>
-            {orderId ? `Order #${orderId}` : 'My Orders & Shipments'}
+            {orderId ? `Order #${orderId}` : 'My Orders & Real-time Tracking'}
           </h1>
-          <span style={{ fontSize: '0.95rem', color: 'var(--muted)' }}>
-            ({orders.length} Total Orders)
+          <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+            ({orders.length} Orders)
           </span>
+          {socketConnected && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                color: '#03a685',
+                backgroundColor: '#e8f7f3',
+                padding: '2px 8px',
+                borderRadius: 12,
+              }}
+            >
+              <Radio size={12} className="animate-pulse" /> Live Tracking
+            </span>
+          )}
         </div>
         {orderId && (
           <Link to="/orders" className="btn btn-outline btn-sm">
@@ -169,6 +252,7 @@ export const Orders = () => {
         {(orderId ? orders.filter((o) => (o._id === orderId || o.orderId === orderId || o.id === orderId)) : orders).map((ord) => {
           const isCancelled = ord.status === 'Cancelled';
           const isDelivered = ord.status === 'Delivered';
+          const currentStep = getStepIndex(ord.status);
 
           return (
             <div
@@ -195,7 +279,7 @@ export const Orders = () => {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
                     Order Placed
                   </div>
                   <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
@@ -208,14 +292,14 @@ export const Orders = () => {
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
                     Order ID
                   </div>
                   <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{ord.orderId}</div>
                 </div>
 
                 <div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
                     Total Amount
                   </div>
                   <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>₹{ord.total?.toLocaleString('en-IN')}</div>
@@ -223,6 +307,92 @@ export const Orders = () => {
 
                 <div>{getStatusBadge(ord.status)}</div>
               </div>
+
+              {/* Delivery OTP Highlight Card for Active Delivery Handover */}
+              {!isCancelled && !isDelivered && (ord.deliveryOtp || ord.shipment?.deliveryOtp) && (
+                <div
+                  style={{
+                    backgroundColor: '#fff0f3',
+                    borderBottom: '1px solid #ffd0d9',
+                    padding: '12px 24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <KeyRound size={20} color="var(--primary)" />
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--dark)' }}>
+                        Delivery Handover Security OTP
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--secondary)' }}>
+                        Share this 4-digit code with your courier partner upon doorstep arrival
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 900,
+                      letterSpacing: 4,
+                      color: 'var(--primary)',
+                      backgroundColor: '#ffffff',
+                      padding: '4px 16px',
+                      borderRadius: 6,
+                      border: '1px dashed var(--primary)',
+                    }}
+                  >
+                    {ord.deliveryOtp || ord.shipment?.deliveryOtp}
+                  </div>
+                </div>
+              )}
+
+              {/* Lifecycle Progress Stepper (PLACED → DELIVERED) */}
+              {!isCancelled && (
+                <div style={{ padding: '20px 24px 10px 24px', backgroundColor: '#fdfdfe', borderBottom: '1px solid var(--border-light)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative', overflowX: 'auto', paddingBottom: 8 }}>
+                    {LIFECYCLE_STEPS.map((step, sIdx) => {
+                      const isPast = sIdx < currentStep;
+                      const isCurrent = sIdx === currentStep;
+                      return (
+                        <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 80, zIndex: 1 }}>
+                          <div
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: '50%',
+                              backgroundColor: isPast || isCurrent ? 'var(--primary)' : '#e5e7eb',
+                              color: '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              boxShadow: isCurrent ? '0 0 0 4px rgba(255, 63, 108, 0.2)' : 'none',
+                              marginBottom: 6,
+                            }}
+                          >
+                            {isPast ? '✓' : sIdx + 1}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              fontWeight: isCurrent ? 800 : 600,
+                              color: isCurrent ? 'var(--primary)' : isPast ? 'var(--dark)' : 'var(--muted)',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {step}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Items in this Order */}
               <div style={{ padding: '20px 24px' }}>
@@ -275,7 +445,7 @@ export const Orders = () => {
                     <Truck size={16} color="var(--primary)" />
                     <span>
                       {isDelivered
-                        ? 'Delivered safely to your address'
+                        ? 'Delivered safely to your destination'
                         : isCancelled
                         ? 'Order was cancelled'
                         : `Estimated Delivery: ${ord.estimatedDeliveryDate || '3-4 Business Days'}`}
@@ -319,103 +489,92 @@ export const Orders = () => {
       </div>
 
       {/* Cancel Order Modal */}
-      <Modal
-        isOpen={!!cancelModalOrder}
-        onClose={() => setCancelModalOrder(null)}
-        title="Cancel Order"
-      >
-        <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: 16 }}>
-          Are you sure you want to cancel order <strong>#{cancelModalOrder?.orderId}</strong>? Reserved inventory will be instantly restored to the catalog.
-        </p>
-
-        <div className="form-group">
-          <label className="form-label">Reason for Cancellation</label>
-          <select
-            className="form-control"
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-          >
-            <option value="Found cheaper elsewhere">Found cheaper elsewhere</option>
-            <option value="Changed delivery address">Changed delivery address</option>
-            <option value="Expected delivery date is too late">Expected delivery date is too late</option>
-            <option value="Ordered by mistake">Ordered by mistake</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setCancelModalOrder(null)}
-          >
-            Keep Order
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            style={{ backgroundColor: 'var(--danger)' }}
-            disabled={cancelling}
-            onClick={handleCancelOrder}
-          >
-            {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
-          </button>
-        </div>
-      </Modal>
+      {cancelModalOrder && (
+        <Modal
+          isOpen={Boolean(cancelModalOrder)}
+          onClose={() => setCancelModalOrder(null)}
+          title={`Cancel Order #${cancelModalOrder.orderId}`}
+        >
+          <div style={{ padding: '8px 0' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: 16 }}>
+              Are you sure you wish to cancel this order? Reserved items will be released back to inventory immediately.
+            </p>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                Reason for Cancellation
+              </label>
+              <select
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 4 }}
+              >
+                <option value="Found cheaper elsewhere">Found cheaper elsewhere</option>
+                <option value="Changed my mind">Changed my mind</option>
+                <option value="Delivery time too long">Delivery time too long</option>
+                <option value="Ordered by mistake">Ordered by mistake</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={() => setCancelModalOrder(null)} className="btn btn-outline btn-sm">
+                Keep Order
+              </button>
+              <button onClick={handleCancelOrder} className="btn btn-primary btn-sm" disabled={cancelling}>
+                {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Request Return Modal */}
-      <Modal
-        isOpen={!!returnModalOrder}
-        onClose={() => setReturnModalOrder(null)}
-        title="Request Return & Refund"
-      >
-        <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: 16 }}>
-          Myntra Pro offers a 14-day hassle-free doorstep return and exchange policy.
-        </p>
-
-        <div className="form-group">
-          <label className="form-label">Return Reason</label>
-          <select
-            className="form-control"
-            value={returnReason}
-            onChange={(e) => setReturnReason(e.target.value)}
-          >
-            <option value="Size/Fit issue">Size or Fit issue</option>
-            <option value="Defective / Damaged product">Defective / Damaged product</option>
-            <option value="Not as pictured">Product does not match picture</option>
-            <option value="Quality not satisfactory">Quality not satisfactory</option>
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label className="form-label">Comments (Optional)</label>
-          <textarea
-            className="form-control"
-            rows={3}
-            placeholder="Help us improve our sizing or quality..."
-            value={returnComment}
-            onChange={(e) => setReturnComment(e.target.value)}
-          />
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={() => setReturnModalOrder(null)}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={returning}
-            onClick={handleRequestReturn}
-          >
-            {returning ? 'Submitting...' : 'Submit Return Request'}
-          </button>
-        </div>
-      </Modal>
+      {returnModalOrder && (
+        <Modal
+          isOpen={Boolean(returnModalOrder)}
+          onClose={() => setReturnModalOrder(null)}
+          title={`Initiate Doorstep Return: #${returnModalOrder.orderId}`}
+        >
+          <div style={{ padding: '8px 0' }}>
+            <p style={{ fontSize: '0.9rem', color: 'var(--muted)', marginBottom: 16 }}>
+              Our courier will arrive at your address within 24 to 48 hours for doorstep parcel verification and pickup.
+            </p>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                Return Discrepancy Reason
+              </label>
+              <select
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 4 }}
+              >
+                <option value="Size/Fit issue">Size / Fit Discrepancy</option>
+                <option value="Fabric quality not as expected">Fabric quality not as expected</option>
+                <option value="Defective or damaged item">Defective or damaged item</option>
+                <option value="Different item received">Different item received</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                Additional Notes
+              </label>
+              <textarea
+                value={returnComment}
+                onChange={(e) => setReturnComment(e.target.value)}
+                placeholder="Describe the issue..."
+                rows={3}
+                style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 4 }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button onClick={() => setReturnModalOrder(null)} className="btn btn-outline btn-sm">
+                Cancel
+              </button>
+              <button onClick={handleRequestReturn} className="btn btn-primary btn-sm" disabled={returning}>
+                {returning ? 'Submitting...' : 'Confirm Doorstep Pickup'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

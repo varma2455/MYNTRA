@@ -309,23 +309,82 @@ export const Checkout = () => {
                 </div>
               </label>
 
+              {/* 1. Razorpay Gateway */}
               <label
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
                   padding: '14px 18px',
-                  border: `2px solid ${paymentMethod === 'Credit Card' ? 'var(--primary)' : 'var(--border)'}`,
+                  border: `2px solid ${paymentMethod === 'Razorpay' ? 'var(--primary)' : 'var(--border)'}`,
                   borderRadius: 6,
                   cursor: 'pointer',
-                  backgroundColor: paymentMethod === 'Credit Card' ? 'var(--primary-light)' : '#ffffff',
+                  backgroundColor: paymentMethod === 'Razorpay' ? 'var(--primary-light)' : '#ffffff',
                 }}
               >
                 <input
                   type="radio"
                   name="payment"
-                  checked={paymentMethod === 'Credit Card'}
-                  onChange={() => setPaymentMethod('Credit Card')}
+                  checked={paymentMethod === 'Razorpay'}
+                  onChange={() => setPaymentMethod('Razorpay')}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+                <ShieldCheck size={20} color="var(--primary)" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Razorpay (Secure Gateway)</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                    UPI, Credit/Debit Cards, Net Banking & Wallets via Razorpay
+                  </div>
+                </div>
+              </label>
+
+              {/* 2. Direct UPI */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '14px 18px',
+                  border: `2px solid ${paymentMethod === 'UPI' ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  backgroundColor: paymentMethod === 'UPI' ? 'var(--primary-light)' : '#ffffff',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'UPI'}
+                  onChange={() => setPaymentMethod('UPI')}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+                <Smartphone size={20} color="var(--primary)" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>UPI (Instant Simulation)</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                    Google Pay, PhonePe, Paytm, BHIM & Any UPI App
+                  </div>
+                </div>
+              </label>
+
+              {/* 3. Cards */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '14px 18px',
+                  border: `2px solid ${paymentMethod === 'Cards' || paymentMethod === 'Credit Card' ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  backgroundColor: paymentMethod === 'Cards' || paymentMethod === 'Credit Card' ? 'var(--primary-light)' : '#ffffff',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'Cards' || paymentMethod === 'Credit Card'}
+                  onChange={() => setPaymentMethod('Cards')}
                   style={{ accentColor: 'var(--primary)' }}
                 />
                 <CreditCard size={20} color="var(--primary)" />
@@ -337,30 +396,60 @@ export const Checkout = () => {
                 </div>
               </label>
 
+              {/* 4. Net Banking */}
               <label
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 14,
                   padding: '14px 18px',
-                  border: `2px solid ${paymentMethod === 'COD' ? 'var(--primary)' : 'var(--border)'}`,
+                  border: `2px solid ${paymentMethod === 'Net Banking' ? 'var(--primary)' : 'var(--border)'}`,
                   borderRadius: 6,
                   cursor: 'pointer',
-                  backgroundColor: paymentMethod === 'COD' ? 'var(--primary-light)' : '#ffffff',
+                  backgroundColor: paymentMethod === 'Net Banking' ? 'var(--primary-light)' : '#ffffff',
                 }}
               >
                 <input
                   type="radio"
                   name="payment"
-                  checked={paymentMethod === 'COD'}
-                  onChange={() => setPaymentMethod('COD')}
+                  checked={paymentMethod === 'Net Banking'}
+                  onChange={() => setPaymentMethod('Net Banking')}
+                  style={{ accentColor: 'var(--primary)' }}
+                />
+                <ShieldCheck size={20} color="#03a685" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Net Banking</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                    HDFC, ICICI, SBI, Axis, Kotak & 50+ Major Indian Banks
+                  </div>
+                </div>
+              </label>
+
+              {/* 5. Cash on Delivery */}
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '14px 18px',
+                  border: `2px solid ${paymentMethod === 'Cash on Delivery' || paymentMethod === 'COD' ? 'var(--primary)' : 'var(--border)'}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  backgroundColor: paymentMethod === 'Cash on Delivery' || paymentMethod === 'COD' ? 'var(--primary-light)' : '#ffffff',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'Cash on Delivery' || paymentMethod === 'COD'}
+                  onChange={() => setPaymentMethod('Cash on Delivery')}
                   style={{ accentColor: 'var(--primary)' }}
                 />
                 <Banknote size={20} color="var(--primary)" />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Cash On Delivery (COD)</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                    Pay in cash or QR code when your courier arrives
+                    Pay in cash or dynamic QR code with OTP verification upon courier arrival
                   </div>
                 </div>
               </label>

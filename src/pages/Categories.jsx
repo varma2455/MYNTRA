@@ -34,21 +34,21 @@ export const Categories = () => {
   if (loading) {
     return (
       <div className="container" style={{ padding: '60px 20px' }}>
-        <Loader size="large" text="Loading 15 Fashion Departments..." />
+        <Loader size="large" text="Loading Fashion Departments..." />
       </div>
     );
   }
 
   return (
     <div className="container" style={{ paddingBottom: '60px' }}>
-      <Breadcrumbs items={[{ label: 'All 15 Categories' }]} />
+      <Breadcrumbs items={[{ label: 'All Categories' }]} />
 
       <div style={{ textAlign: 'center', margin: '20px 0 40px 0' }}>
         <h1 style={{ fontSize: '2.2rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Explore 15 Official Departments
+          Explore Curated Departments
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: '1rem', maxWidth: '640px', margin: '8px auto 0 auto' }}>
-          Discover over 750+ hand-curated fashion, footwear, beauty and lifestyle designs with verified stock and fast express shipping.
+          Discover hand-curated fashion, footwear, beauty and luxury lifestyle collections with verified stock and fast express shipping.
         </p>
       </div>
 

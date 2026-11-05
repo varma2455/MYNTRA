@@ -12,6 +12,7 @@ const SORT_OPTIONS = [
   { value: 'price_low', label: 'Price: Low to High' },
   { value: 'price_high', label: 'Price: High to Low' },
   { value: 'rating', label: 'Customer Rating' },
+  { value: 'discount', label: 'Better Discount' },
 ];
 
 export const ProductListing = () => {
@@ -28,9 +29,11 @@ export const ProductListing = () => {
   const maxPrice = searchParams.get('maxPrice') || '';
   const minDiscount = searchParams.get('minDiscount') || '';
   const minRating = searchParams.get('minRating') || '';
-  const sizes = searchParams.get('sizes') || '';
+  const sizes = searchParams.get('sizes') || searchParams.get('size') || '';
+  const colors = searchParams.get('colors') || searchParams.get('color') || '';
+  const availability = searchParams.get('availability') || '';
   const q = searchParams.get('q') || '';
-  const sortBy = searchParams.get('sortBy') || 'popularity';
+  const sortBy = searchParams.get('sortBy') || searchParams.get('sort') || 'popularity';
   const page = parseInt(searchParams.get('page') || '1', 10);
 
   const [productsData, setProductsData] = useState({
@@ -70,6 +73,8 @@ export const ProductListing = () => {
     if (minDiscount) params.minDiscount = minDiscount;
     if (minRating) params.minRating = minRating;
     if (sizes) params.sizes = sizes;
+    if (colors) params.colors = colors;
+    if (availability) params.availability = availability;
     if (q) params.q = q;
 
     productService
@@ -101,7 +106,7 @@ export const ProductListing = () => {
       .finally(() => {
         setLoading(false);
       });
-  }, [category, subCategory, brand, minPrice, maxPrice, minDiscount, minRating, sizes, q, sortBy, page]);
+  }, [category, subCategory, brand, minPrice, maxPrice, minDiscount, minRating, sizes, colors, availability, q, sortBy, page]);
 
   useEffect(() => {
     fetchProducts();
@@ -123,7 +128,6 @@ export const ProductListing = () => {
   // Clear all filters
   const clearAllFilters = () => {
     const newParams = new URLSearchParams();
-    if (category) newParams.set('category', category);
     setSearchParams(newParams);
   };
 
@@ -148,7 +152,7 @@ export const ProductListing = () => {
   const breadcrumbItems = [
     ...(category
       ? [
-          { label: 'Categories', href: '/categories' },
+          { label: 'Categories', href: '/products' },
           { label: currentCategoryObj ? currentCategoryObj.name : category },
         ]
       : q
@@ -158,6 +162,18 @@ export const ProductListing = () => {
 
   // Active filter tags
   const activeFilters = [];
+  if (category && category !== slug) {
+    category.split(',').forEach((c) => {
+      const catObj = categories.find((cat) => cat.id === c.trim() || cat.slug === c.trim());
+      activeFilters.push({
+        label: `Category: ${catObj ? catObj.name : c.trim()}`,
+        remove: () => {
+          const remaining = category.split(',').filter((x) => x.trim() !== c.trim()).join(',');
+          updateFilter('category', remaining);
+        },
+      });
+    });
+  }
   if (brand) {
     brand.split(',').forEach((b) => {
       activeFilters.push({
@@ -170,11 +186,17 @@ export const ProductListing = () => {
     });
   }
   if (minPrice || maxPrice) {
+    let pLabel = `₹${minPrice || '0'} - ₹${maxPrice || 'Above'}`;
+    if (!minPrice && maxPrice) pLabel = `Under ₹${maxPrice}`;
+    if (minPrice && !maxPrice) pLabel = `Above ₹${minPrice}`;
     activeFilters.push({
-      label: `₹${minPrice || '0'} - ₹${maxPrice || 'Above'}`,
+      label: pLabel,
       remove: () => {
-        updateFilter('minPrice', '');
-        updateFilter('maxPrice', '');
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('minPrice');
+        newParams.delete('maxPrice');
+        newParams.set('page', '1');
+        setSearchParams(newParams);
       },
     });
   }
@@ -199,6 +221,23 @@ export const ProductListing = () => {
           updateFilter('sizes', remaining);
         },
       });
+    });
+  }
+  if (colors) {
+    colors.split(',').forEach((c) => {
+      activeFilters.push({
+        label: `Color: ${c.trim()}`,
+        remove: () => {
+          const remaining = colors.split(',').filter((x) => x.trim() !== c.trim()).join(',');
+          updateFilter('colors', remaining);
+        },
+      });
+    });
+  }
+  if (availability) {
+    activeFilters.push({
+      label: availability === 'inStock' ? 'In Stock' : 'Out of Stock',
+      remove: () => updateFilter('availability', ''),
     });
   }
 
@@ -288,7 +327,15 @@ export const ProductListing = () => {
               <button
                 type="button"
                 onClick={af.remove}
-                style={{ display: 'flex', alignItems: 'center', color: 'var(--muted)' }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: 'var(--muted)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
                 aria-label={`Remove filter ${af.label}`}
               >
                 <X size={12} />
@@ -304,6 +351,10 @@ export const ProductListing = () => {
               fontWeight: 700,
               marginLeft: 8,
               textDecoration: 'underline',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
             }}
           >
             Clear All
@@ -322,11 +373,12 @@ export const ProductListing = () => {
             minDiscount,
             minRating,
             sizes,
+            colors,
+            availability,
           }}
           onChange={updateFilter}
           onClear={clearAllFilters}
           availableBrands={availableBrands}
-          categories={categories}
           totalCount={productsData.totalCount}
         />
 
@@ -369,21 +421,42 @@ export const ProductListing = () => {
                     className="btn btn-outline btn-sm"
                     disabled={page <= 1}
                     onClick={() => handlePageChange(page - 1)}
-                    style={{ opacity: page <= 1 ? 0.4 : 1 }}
+                    style={{ opacity: page <= 1 ? 0.4 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
                   >
                     <ChevronLeft size={16} /> Prev
                   </button>
 
-                  <span style={{ fontSize: '0.88rem', fontWeight: 600, padding: '0 12px' }}>
-                    Page {page} of {productsData.totalPages}
-                  </span>
+                  {Array.from({ length: productsData.totalPages }).map((_, idx) => {
+                    const pNum = idx + 1;
+                    const isActive = pNum === page;
+                    return (
+                      <button
+                        key={pNum}
+                        type="button"
+                        onClick={() => handlePageChange(pNum)}
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 4,
+                          border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                          backgroundColor: isActive ? 'var(--primary)' : '#ffffff',
+                          color: isActive ? '#ffffff' : 'var(--dark)',
+                          fontWeight: 700,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {pNum}
+                      </button>
+                    );
+                  })}
 
                   <button
                     type="button"
                     className="btn btn-outline btn-sm"
                     disabled={page >= productsData.totalPages}
                     onClick={() => handlePageChange(page + 1)}
-                    style={{ opacity: page >= productsData.totalPages ? 0.4 : 1 }}
+                    style={{ opacity: page >= productsData.totalPages ? 0.4 : 1, cursor: page >= productsData.totalPages ? 'not-allowed' : 'pointer' }}
                   >
                     Next <ChevronRight size={16} />
                   </button>
