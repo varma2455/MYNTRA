@@ -16,7 +16,7 @@ import {
   Radio,
   MapPin
 } from 'lucide-react';
-import io from 'socket.io-client';
+import supabase from '../lib/supabase';
 import { orderService } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -75,46 +75,64 @@ export const Orders = () => {
     }
   }, [isAuthenticated]);
 
-  // Socket.IO Real-time updates
+  // Supabase Real-time updates for orders & deliveries
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-    const socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-    });
+    if (!isAuthenticated) return;
 
-    socket.on('connect', () => {
-      setSocketConnected(true);
-    });
-
-    socket.on('order:status_update', (data) => {
-      if (data?.orderId) {
-        info(`Order #${data.orderId} status updated: ${data.status}`);
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.orderId === data.orderId ? { ...o, status: data.status, trackingNumber: data.trackingNumber || o.trackingNumber } : o
-          )
-        );
-      }
-    });
-
-    socket.on('delivery:otp_verified', (data) => {
-      if (data?.orderId) {
-        success(`Delivery confirmed for Order #${data.orderId}!`);
-        setOrders((prev) =>
-          prev.map((o) => (o.orderId === data.orderId ? { ...o, status: 'Delivered', isOtpVerified: true } : o))
-        );
-      }
-    });
-
-    socket.on('disconnect', () => {
-      setSocketConnected(false);
-    });
+    const channel = supabase
+      .channel('realtime:orders')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          if (payload.new && payload.new.order_id) {
+            const updated = payload.new;
+            info(`Order #${updated.order_id} status updated: ${updated.status}`);
+            setOrders((prev) =>
+              prev.map((o) =>
+                o.orderId === updated.order_id
+                  ? {
+                      ...o,
+                      status: updated.status,
+                      isOtpVerified: updated.is_otp_verified,
+                      paymentStatus: updated.payment_status,
+                      trackingNumber: updated.tracking_number || o.trackingNumber,
+                    }
+                  : o
+              )
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shipments',
+        },
+        (payload) => {
+          if (payload.new) {
+            const updated = payload.new;
+            if (updated.status === 'Delivered') {
+              success(`Delivery confirmed for Shipment #${updated.shipment_id}!`);
+            }
+            fetchOrders();
+          }
+        }
+      )
+      .subscribe((status) => {
+        setSocketConnected(status === 'SUBSCRIBED');
+      });
 
     return () => {
-      socket.disconnect();
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   const handleCancelOrder = async () => {
     if (!cancelModalOrder) return;

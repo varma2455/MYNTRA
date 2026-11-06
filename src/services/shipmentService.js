@@ -1,37 +1,45 @@
-import api from './api';
+import supabase from '../lib/supabase';
+import { deliveryService } from './deliveryService';
+import { partnerService } from './partnerService';
 
 export const shipmentService = {
   async getShipments(params = {}) {
-    const response = await api.get('/admin/shipments', { params });
-    return response.data;
+    return await partnerService.getShipments(params);
   },
 
   async getShipmentById(id) {
-    const response = await api.get(`/admin/shipments/${id}`);
-    return response.data;
+    return await deliveryService.getDeliveryById(id);
   },
 
   async getAvailableShipments() {
-    const response = await api.get('/admin/shipments/available');
-    return response.data;
+    return await deliveryService.getAvailableDeliveries();
   },
 
   async createShipment(shipmentData) {
-    const response = await api.post('/admin/shipments', shipmentData);
-    return response.data;
+    const { data, error } = await supabase
+      .from('shipments')
+      .insert({
+        shipment_id: shipmentData.shipmentId || `SHP-${Date.now().toString(36).toUpperCase()}`,
+        order_id: shipmentData.orderId,
+        order_code: shipmentData.orderCode || 'MYN-PRO',
+        recipient: shipmentData.recipient,
+        package_details: shipmentData.packageDetails || {},
+        status: shipmentData.status || 'Created',
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 
   async updateShipmentStatus(id, status, location, note) {
-    const response = await api.patch(`/admin/shipments/${id}/status`, {
-      status,
-      location,
-      note,
-    });
-    return response.data;
+    return await partnerService.updateShipmentStatus(id, status, note, location);
   },
 
   async recordEvent(id, eventData) {
-    const response = await api.post(`/admin/shipments/${id}/events`, eventData);
-    return response.data;
+    return await partnerService.recordTrackingEvent(id, eventData);
   },
 };
+
+export default shipmentService;
